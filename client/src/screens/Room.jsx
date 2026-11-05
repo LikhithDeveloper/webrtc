@@ -10,6 +10,7 @@ const RoomPage = () => {
   const [remoteStream, setRemoteStream] = useState();
   // Renegotiation is only allowed once the initial offer/answer is done
   const callReady = useRef(false);
+  const remoteIdRef = useRef(null);
 
   // Adds each local track once; safe to call repeatedly
   const addTracks = useCallback((stream) => {
@@ -23,6 +24,7 @@ const RoomPage = () => {
 
   const handleUserJoined = useCallback(({ email, id }) => {
     console.log(`Email ${email} joined room`);
+    remoteIdRef.current = id;
     setRemoteSocketId(id);
   }, []);
 
@@ -39,6 +41,7 @@ const RoomPage = () => {
 
   const handleIncommingCall = useCallback(
     async ({ from, offer }) => {
+      remoteIdRef.current = from;
       setRemoteSocketId(from);
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -96,6 +99,25 @@ const RoomPage = () => {
       setRemoteStream(remoteStream[0]);
     });
   }, []);
+
+  // Trickle ICE: send our candidates to the peer, apply theirs
+  useEffect(() => {
+    const onLocalCandidate = (ev) => {
+      if (ev.candidate && remoteIdRef.current) {
+        socket.emit("ice:candidate", {
+          to: remoteIdRef.current,
+          candidate: ev.candidate,
+        });
+      }
+    };
+    const onRemoteCandidate = ({ candidate }) => peer.addCandidate(candidate);
+    peer.peer.addEventListener("icecandidate", onLocalCandidate);
+    socket.on("ice:candidate", onRemoteCandidate);
+    return () => {
+      peer.peer.removeEventListener("icecandidate", onLocalCandidate);
+      socket.off("ice:candidate", onRemoteCandidate);
+    };
+  }, [socket]);
 
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
