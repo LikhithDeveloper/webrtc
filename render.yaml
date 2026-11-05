@@ -3,6 +3,7 @@ services:
   - type: web
     name: webrtc-server
     runtime: node
+    plan: free
     rootDir: server
     buildCommand: npm install
     startCommand: npm start
