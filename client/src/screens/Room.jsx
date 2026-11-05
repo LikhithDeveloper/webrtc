@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import ReactPlayer from "react-player";
 import peer from "../service/peer";
 import { useSocket } from "../context/SocketProvider";
@@ -8,6 +8,18 @@ const RoomPage = () => {
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState();
   const [remoteStream, setRemoteStream] = useState();
+  // Renegotiation is only allowed once the initial offer/answer is done
+  const callReady = useRef(false);
+
+  // Adds each local track once; safe to call repeatedly
+  const addTracks = useCallback((stream) => {
+    const senders = peer.peer.getSenders();
+    for (const track of stream.getTracks()) {
+      if (!senders.some((s) => s.track === track)) {
+        peer.peer.addTrack(track, stream);
+      }
+    }
+  }, []);
 
   const handleUserJoined = useCallback(({ email, id }) => {
     console.log(`Email ${email} joined room`);
@@ -19,10 +31,11 @@ const RoomPage = () => {
       audio: true,
       video: true,
     });
+    setMyStream(stream);
+    addTracks(stream);
     const offer = await peer.getOffer();
     socket.emit("user:call", { to: remoteSocketId, offer });
-    setMyStream(stream);
-  }, [remoteSocketId, socket]);
+  }, [remoteSocketId, socket, addTracks]);
 
   const handleIncommingCall = useCallback(
     async ({ from, offer }) => {
@@ -33,28 +46,26 @@ const RoomPage = () => {
       });
       setMyStream(stream);
       console.log(`Incoming Call`, from, offer);
+      addTracks(stream);
       const ans = await peer.getAnswer(offer);
+      callReady.current = true;
       socket.emit("call:accepted", { to: from, ans });
     },
-    [socket]
+    [socket, addTracks]
   );
 
   const sendStreams = useCallback(() => {
-    for (const track of myStream.getTracks()) {
-      peer.peer.addTrack(track, myStream);
-    }
-  }, [myStream]);
+    if (myStream) addTracks(myStream);
+  }, [myStream, addTracks]);
 
-  const handleCallAccepted = useCallback(
-    ({ from, ans }) => {
-      peer.setLocalDescription(ans);
-      console.log("Call Accepted!");
-      sendStreams();
-    },
-    [sendStreams]
-  );
+  const handleCallAccepted = useCallback(async ({ from, ans }) => {
+    await peer.setLocalDescription(ans);
+    callReady.current = true;
+    console.log("Call Accepted!");
+  }, []);
 
   const handleNegoNeeded = useCallback(async () => {
+    if (!callReady.current) return;
     const offer = await peer.getOffer();
     socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
   }, [remoteSocketId, socket]);
@@ -132,9 +143,9 @@ const RoomPage = () => {
           <h1>Remote Stream</h1>
           <ReactPlayer
             playing
-            muted
-            height="100px"
-            width="200px"
+            playsinline
+            height="200px"
+            width="300px"
             url={remoteStream}
           />
         </>
