@@ -1,7 +1,27 @@
+const http = require("http");
 const { Server } = require("socket.io");
 
-const io = new Server(8000, {
-  cors: true,
+const PORT = process.env.PORT || 8000;
+const CLIENT_URL = process.env.CLIENT_URL || "*";
+
+const httpServer = http.createServer((req, res) => {
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    return res.end("ok");
+  }
+  res.writeHead(404);
+  res.end();
+});
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: CLIENT_URL === "*" ? true : CLIENT_URL.split(","),
+    methods: ["GET", "POST"],
+  },
+});
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`Signaling server listening on ${PORT}`);
 });
 
 const emailToSocketIdMap = new Map();
