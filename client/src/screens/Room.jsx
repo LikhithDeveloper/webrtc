@@ -11,6 +11,8 @@ const RoomPage = () => {
   // Renegotiation is only allowed once the initial offer/answer is done
   const callReady = useRef(false);
   const remoteIdRef = useRef(null);
+  const [iceState, setIceState] = useState("new");
+  const [candTypes, setCandTypes] = useState([]);
 
   // Adds each local track once; safe to call repeatedly
   const addTracks = useCallback((stream) => {
@@ -102,7 +104,13 @@ const RoomPage = () => {
 
   // Trickle ICE: send our candidates to the peer, apply theirs
   useEffect(() => {
+    const onIceState = () => setIceState(peer.peer.iceConnectionState);
+    peer.peer.addEventListener("iceconnectionstatechange", onIceState);
     const onLocalCandidate = (ev) => {
+      if (ev.candidate) {
+        const t = ev.candidate.type || "unknown";
+        setCandTypes((prev) => (prev.includes(t) ? prev : [...prev, t]));
+      }
       if (ev.candidate && remoteIdRef.current) {
         socket.emit("ice:candidate", {
           to: remoteIdRef.current,
@@ -115,6 +123,7 @@ const RoomPage = () => {
     socket.on("ice:candidate", onRemoteCandidate);
     return () => {
       peer.peer.removeEventListener("icecandidate", onLocalCandidate);
+      peer.peer.removeEventListener("iceconnectionstatechange", onIceState);
       socket.off("ice:candidate", onRemoteCandidate);
     };
   }, [socket]);
@@ -146,6 +155,9 @@ const RoomPage = () => {
     <div>
       <h1>Room Page</h1>
       <h4>{remoteSocketId ? "Connected" : "No one in room"}</h4>
+      <p>
+        ICE: {iceState} | local candidates: {candTypes.join(", ") || "none"}
+      </p>
       {myStream && <button onClick={sendStreams}>Send Stream</button>}
       {remoteSocketId && <button onClick={handleCallUser}>CALL</button>}
       {myStream && (
