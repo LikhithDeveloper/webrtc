@@ -1,23 +1,27 @@
-// TURN is only enabled when configured (build-time env vars), e.g. a free
-// Metered account:
-//   REACT_APP_TURN_URLS="turn:a.relay.metered.ca:80,turns:a.relay.metered.ca:443?transport=tcp"
-//   REACT_APP_TURN_USERNAME, REACT_APP_TURN_CREDENTIAL
 const ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun.relay.metered.ca:80" },
   {
-    urls: [
-      "stun:stun.l.google.com:19302",
-      "stun:global.stun.twilio.com:3478",
-    ],
+    urls: "turn:global.relay.metered.ca:80",
+    username: "decc848ba2ba5481911ee004",
+    credential: "OU/Kdw2LhMHckv5E",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "decc848ba2ba5481911ee004",
+    credential: "OU/Kdw2LhMHckv5E",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "decc848ba2ba5481911ee004",
+    credential: "OU/Kdw2LhMHckv5E",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "decc848ba2ba5481911ee004",
+    credential: "OU/Kdw2LhMHckv5E",
   },
 ];
-
-if (process.env.REACT_APP_TURN_URLS) {
-  ICE_SERVERS.push({
-    urls: process.env.REACT_APP_TURN_URLS.split(",").map((u) => u.trim()),
-    username: process.env.REACT_APP_TURN_USERNAME,
-    credential: process.env.REACT_APP_TURN_CREDENTIAL,
-  });
-}
 
 class PeerService {
   constructor() {
