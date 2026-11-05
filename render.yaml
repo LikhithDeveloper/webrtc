@@ -1,32 +1,12 @@
 services:
-  # Socket.IO signaling server
+  # Single service: Node server serves the React build + Socket.IO signaling
   - type: web
-    name: webrtc-server
+    name: webrtc
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm --prefix client install && npm --prefix client run build && npm --prefix server install
+    startCommand: node server/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 18
-      # Set to your frontend URL after first deploy, e.g. https://webrtc-client.onrender.com
-      - key: CLIENT_URL
-        sync: false
-
-  # React static site
-  - type: web
-    name: webrtc-client
-    runtime: static
-    rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: build
-    envVars:
-      # Set to your backend URL, e.g. https://webrtc-server.onrender.com
-      - key: REACT_APP_SERVER_URL
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
